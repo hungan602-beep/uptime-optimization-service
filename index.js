@@ -30,7 +30,10 @@ async function main() {
         console.error("No accounts.json found in config/");
         process.exit(1);
     }
-    const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
+    const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8')).map(a => {
+        if (!a.email && a.username) a.email = a.username;
+        return a;
+    });
     console.log(`Loaded ${accounts.length} accounts.`);
 
     // Filter by targets if provided via CLI args
@@ -96,13 +99,7 @@ async function main() {
             }
 
             // D. Pending Replies (Priority 2)
-            // Check state for pending replies scheduled for NOW or past
-            // TODO: Implement pending_replies array in state_manager (simple queue)
-            // For v3.4 MVP, skipping complex persistent queue logic to keep file size small.
-            // Start simple: If we see a recovered email, we *could* reply immediately or set a flag.
-            // Let's stick to the plan: "Schedule Reply". 
-            // Implementation: We won't code the full queue logic *in this file* to keep it readable, 
-            // but conceptually it goes here.
+            // ...
 
             // E. Outbound Sending (Priority 3)
             // 1. Working Hours Check
@@ -134,7 +131,6 @@ async function main() {
                         });
 
                         // 7. Schedule Reply (Simulated)
-                        // In a real DB, we'd add { from: target.email, to: account.email, trigger: now + 3h } to a 'jobs' table.
                         console.log(`[SCHEDULE] Reply expected from ${target.email} in 2-4 hours.`);
                     } else {
                         console.log(`[SKIP] No suitable peer found.`);
