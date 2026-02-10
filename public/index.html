@@ -225,9 +225,16 @@ Formats:
 3. IMAP Pipe: email|password|host|port..."></textarea>
 
                     <!-- Preview Stats -->
-                    <div v-if="parsedImportCount > 0" class="text-xs text-slate-500 flex gap-4">
-                        <span class="font-bold ml-auto text-emerald-600">Ready to Import: {{ parsedImportCount }}
-                            Accounts</span>
+                    <!-- Preview Stats -->
+                    <div v-if="parsedImportCount > 0"
+                        class="text-xs font-medium flex gap-4 items-center bg-slate-50 p-2 rounded border border-slate-100">
+                        <span v-if="parsedStats.gmail > 0" class="text-red-600 flex items-center gap-1"><i
+                                class="ph ph-google-logo"></i> {{ parsedStats.gmail }} Gmail</span>
+                        <span v-if="parsedStats.microsoft > 0" class="text-blue-600 flex items-center gap-1"><i
+                                class="ph ph-microsoft-logo"></i> {{ parsedStats.microsoft }} Outlook</span>
+                        <span v-if="parsedStats.generic > 0" class="text-amber-600 flex items-center gap-1"><i
+                                class="ph ph-globe"></i> {{ parsedStats.generic }} Generic</span>
+                        <span class="font-bold ml-auto text-emerald-600">Total: {{ parsedImportCount }} Accounts</span>
                     </div>
 
                     <div class="flex justify-end gap-3 pt-2 border-t">
@@ -341,6 +348,18 @@ Formats:
                 },
                 parsedImportCount() {
                     return this.parsedAccounts.length;
+                },
+                parsedStats() {
+                    const stats = { gmail: 0, microsoft: 0, generic: 0 };
+                    this.parsedAccounts.forEach(acc => {
+                        const type = acc.type || 'generic';
+                        if (stats[type] !== undefined) {
+                            stats[type]++;
+                        } else {
+                            stats.generic++;
+                        }
+                    });
+                    return stats;
                 }
             },
             methods: {
