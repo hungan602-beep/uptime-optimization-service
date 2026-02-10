@@ -11,12 +11,33 @@ const ACCOUNTS_FILE = path.join(__dirname, 'config/accounts.json');
 
 // Middleware
 app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // In-Memory Control State (Runtime override)
 const runtimeFlags = {};
 
 // --- API Endpoints ---
+
+// 0. Import Accounts (Overwrite)
+app.post('/api/import', (req, res) => {
+    try {
+        const newAccounts = req.body;
+        if (!Array.isArray(newAccounts)) {
+            return res.status(400).json({ error: "Input must be a JSON array [...]." });
+        }
+
+        // Basic validation of first item
+        if (newAccounts.length > 0 && (!newAccounts[0].username || !newAccounts[0].password)) {
+            return res.status(400).json({ error: "Invalid format. Objects must have username and password." });
+        }
+
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(newAccounts, null, 2));
+        res.json({ success: true, count: newAccounts.length });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // 1. Get Status (Poll)
 app.get('/api/status', (req, res) => {
