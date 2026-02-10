@@ -1,8 +1,8 @@
 {
-  "undefined": {
-    "sent_today": 0,
-    "rescued_today": 0,
-    "last_run": null,
+  "info@eforemys.com.tr": {
+    "sent_today": 1,
+    "recovered_today": 0,
+    "last_run": "2026-02-10T16:51:24.655Z",
     "status": "active",
     "cooldown_until": null,
     "bounces_today": 0

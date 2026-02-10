@@ -1,0 +1,4 @@
+DEBUG: Targets -> ["info@eforemys.com.tr"]
+DEBUG: Filter matched 1 accounts.
+DEBUG: Processing Node: info@eforemys.com.tr
+DEBUG: [Generic] Sent to sherrywashington4329@outlook.com: <e8706f5c-0122-4f3d-03b6-579e36e8210d@eforemys.com.tr>

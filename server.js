@@ -2,12 +2,17 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
+const { exec } = require('child_process');
+
 const app = express();
 const PORT = 3000;
 
 // Core Engine
 const StateManager = require('./core/state_manager');
 const ACCOUNTS_FILE = path.join(__dirname, 'config/accounts.json');
+const TOKEN_FILE = path.join(__dirname, 'config/gh_token');
+const GIT_CONFIG_FILE = path.join(__dirname, '.git/config');
 
 // Middleware
 app.use(bodyParser.json());
@@ -16,6 +21,69 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // In-Memory Control State (Runtime override)
 const runtimeFlags = {};
+
+// Helper: Launch Workflow
+function launchWorkflow(token, repoPath, targets, res) {
+    if (!repoPath) repoPath = 'KosenkoMax/network-latency-monitor'; // Fallback default
+
+    const data = JSON.stringify({
+        ref: 'main',
+        inputs: {
+            test_subset: targets.join(',')
+        }
+    });
+
+    const options = {
+        hostname: 'api.github.com',
+        path: `/repos/${repoPath}/actions/workflows/e2e-tests.yml/dispatches`,
+        method: 'POST',
+        headers: {
+            'User-Agent': 'Node.js',
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+            'Content-Length': data.length
+        }
+    };
+
+    console.log(`[GitHub Launch] Dispatching to ${repoPath}...`);
+
+    const ghReq = https.request(options, (ghRes) => {
+        let body = '';
+        ghRes.on('data', chunk => body += chunk);
+        ghRes.on('end', () => {
+            if (ghRes.statusCode >= 200 && ghRes.statusCode < 300) {
+                res.json({ success: true, message: `Workflow dispatched to ${repoPath}.`, run_id: "queued" });
+            } else {
+                console.error("GitHub API Error:", ghRes.statusCode, body);
+                res.status(500).json({ error: `GitHub API Error: ${ghRes.statusCode} - ${body} (Repo: ${repoPath})` });
+            }
+        });
+    });
+
+    ghReq.on('error', (e) => {
+        console.error("Request Error:", e);
+        res.status(500).json({ error: e.message });
+    });
+
+    ghReq.write(data);
+    ghReq.end();
+}
+
+// Helper: Scrape Token from .git/config (Fallback)
+function getTokenFromGitConfig() {
+    try {
+        if (fs.existsSync(GIT_CONFIG_FILE)) {
+            const content = fs.readFileSync(GIT_CONFIG_FILE, 'utf8');
+            // Look for url = https://TOKEN@github.com
+            const match = content.match(/url\s*=\s*https:\/\/([^@]+)@github\.com/);
+            if (match && match[1]) return match[1];
+        }
+    } catch (e) {
+        console.warn("Failed to read .git/config:", e.message);
+    }
+    return null;
+}
 
 // --- API Endpoints ---
 
@@ -138,83 +206,81 @@ app.post('/api/control', (req, res) => {
     res.json({ success: true, affected: targets.length });
 });
 
-
-
-const https = require('https');
-const { exec } = require('child_process');
-
+// 3. GitHub Launch Endpoint
 app.post('/api/github-launch', (req, res) => {
     try {
-        const { targets } = req.body;
+        const { targets, manualToken } = req.body;
         console.log(`[GitHub Launch] Request for ${targets.length} targets.`);
 
-        // 1. Get Token from Git Remote
+        // Step A: Determine Repository URL
         exec('git remote -v', (err, stdout, stderr) => {
-            if (err) {
-                console.error("Git Remote Error:", err);
-                return res.status(500).json({ error: "Failed to read git remote." });
-            }
+            let repoPath = null;
+            let gitRemoteToken = null;
 
-            console.log("Git Remote Output:", stdout); // Debugging
-
-            let token = null;
-
-            // Pattern 1: Standard URL (https://TOKEN@github.com)
-            const urlMatch = stdout.match(/https:\/\/([^@]+)@github\.com/);
-            if (urlMatch && urlMatch[1]) token = urlMatch[1];
-
-            // Pattern 2: Explicit Token Pattern (ghp_)
-            if (!token) {
-                const tokenMatch = stdout.match(/(ghp_[a-zA-Z0-9]+)/);
-                if (tokenMatch && tokenMatch[1]) token = tokenMatch[1];
-            }
-
-            if (!token) {
-                console.error("No token found in:", stdout);
-                return res.status(500).json({ error: "No GitHub token found in git remote. Please ensure you pushed with a PAT." });
-            }
-
-            // 2. Call GitHub API
-            const data = JSON.stringify({
-                ref: 'main',
-                inputs: {
-                    targets: targets.join(',')
+            if (!err) {
+                // Extract Repo Path: github.com/OWNER/REPO.git
+                const repoMatch = stdout.match(/github\.com[:\/]([^\/]+\/[^.]+)(\.git)?/);
+                if (repoMatch && repoMatch[1]) {
+                    repoPath = repoMatch[1];
                 }
-            });
 
-            const options = {
-                hostname: 'api.github.com',
-                path: '/repos/KosenkoMax/network-latency-monitor/actions/workflows/warmup.yml/dispatches',
-                method: 'POST',
-                headers: {
-                    'User-Agent': 'Node.js',
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3+json',
-                    'Content-Type': 'application/json',
-                    'Content-Length': data.length
+                // Extract Token (Pattern 1): https://TOKEN@github.com
+                const urlMatch = stdout.match(/https:\/\/([^@]+)@github\.com/);
+                if (urlMatch && urlMatch[1]) gitRemoteToken = urlMatch[1];
+
+                // Extract Token (Pattern 2): ghp_ in output
+                if (!gitRemoteToken) {
+                    const tokenMatch = stdout.match(/(ghp_[a-zA-Z0-9]+)/);
+                    if (tokenMatch && tokenMatch[1]) gitRemoteToken = tokenMatch[1];
                 }
-            };
+            }
 
-            const ghReq = https.request(options, (ghRes) => {
-                let body = '';
-                ghRes.on('data', chunk => body += chunk);
-                ghRes.on('end', () => {
-                    if (ghRes.statusCode >= 200 && ghRes.statusCode < 300) {
-                        res.json({ success: true, message: "Workflow dispatched.", run_id: "queued" });
-                    } else {
-                        console.error("GitHub API Error:", ghRes.statusCode, body);
-                        res.status(500).json({ error: `GitHub API Error: ${ghRes.statusCode} - ${body}` });
+            // Fallback: Default Repo if not found
+            if (!repoPath) repoPath = 'KosenkoMax/network-latency-monitor';
+
+            console.log(`[GitHub Launch] Resolved Repo: ${repoPath}`);
+
+            // Step B: Determine Token
+
+            // Priority 0: Manual Input (and persist it)
+            if (manualToken) {
+                console.log("Using manual token.");
+                try { fs.writeFileSync(TOKEN_FILE, manualToken.trim(), 'utf8'); } catch (e) { }
+                launchWorkflow(manualToken, repoPath, targets, res);
+                return;
+            }
+
+            // Priority 1: Persisted Token File
+            if (fs.existsSync(TOKEN_FILE)) {
+                try {
+                    const storedToken = fs.readFileSync(TOKEN_FILE, 'utf8').trim();
+                    if (storedToken.length > 10) {
+                        console.log("Using persisted token from file.");
+                        launchWorkflow(storedToken, repoPath, targets, res);
+                        return;
                     }
-                });
-            });
+                } catch (e) { }
+            }
 
-            ghReq.on('error', (e) => {
-                console.error("Request Error:", e);
-                res.status(500).json({ error: e.message });
-            });
+            // Priority 2: Extracted from Git Remote
+            if (gitRemoteToken) {
+                console.log("Using token from git remote.");
+                launchWorkflow(gitRemoteToken, repoPath, targets, res);
+                return;
+            }
 
-            ghReq.write(data);
-            ghReq.end();
+            // Priority 3: Scrape from .git/config (Magical Fallback)
+            const configToken = getTokenFromGitConfig();
+            if (configToken) {
+                console.log("Using token scraped from .git/config.");
+                // Launch immediately
+                launchWorkflow(configToken, repoPath, targets, res);
+                return;
+            }
+
+            // Failed
+            console.error("No token found anywhere.");
+            return res.status(500).json({ error: "No GitHub token found in git remote, config, or file. Please ensure you pushed with a PAT." });
         });
 
     } catch (e) {

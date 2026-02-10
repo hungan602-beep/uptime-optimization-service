@@ -464,6 +464,25 @@ Formats:
                             body: JSON.stringify({ targets })
                         });
                         const data = await res.json();
+
+                        // Handle Token Error: Prompt user for PAT
+                        if (data.error && data.error.includes("No GitHub token")) {
+                            const manualToken = prompt("GitHub Token not found automatically.\n\nPlease paste your GitHub Personal Access Token (starts with ghp_ or github_pat_) to launch:");
+                            if (!manualToken) return;
+
+                            // Retry with manual token
+                            const retryRes = await fetch('/api/github-launch', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ targets, manualToken })
+                            });
+                            const retryData = await retryRes.json();
+                            if (retryData.error) throw new Error(retryData.error);
+                            alert(`Successfully launched on GitHub!\nWorkflow ID: ${retryData.run_id || 'Pending'}\nInspect 'Actions' tab on GitHub.`);
+                            this.selected = [];
+                            return;
+                        }
+
                         if (data.error) throw new Error(data.error);
                         alert(`Successfully launched on GitHub!\nWorkflow ID: ${data.run_id || 'Pending'}\nInspect 'Actions' tab on GitHub.`);
                         this.selected = [];
