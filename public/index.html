@@ -78,6 +78,10 @@
 
             <!-- Actions -->
             <div class="flex gap-3">
+                <button @click="launchOnGithub(true)"
+                    class="flex items-center gap-2 px-3 py-2 bg-slate-800 text-white hover:bg-slate-900 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    <i class="ph ph-rocket-launch"></i> Launch Infinity Pool (All)
+                </button>
                 <button @click="importModalOpen = true"
                     class="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">
                     <i class="ph ph-upload-simple"></i> Import Nodes
@@ -440,15 +444,22 @@ Formats:
                     this.selected = []; // Clear selection
                     this.fetchStatus();
                 },
-                async launchOnGithub() {
-                    if (this.selected.length === 0) return;
-                    if (!confirm(`Launch ${this.selected.length} nodes on GitHub Infinity Pool?`)) return;
+                async launchOnGithub(isAll = false) {
+                    let targets = [];
+                    if (isAll) {
+                        if (!confirm(`Launch ALL ${this.accounts.length} nodes on GitHub Infinity Pool?`)) return;
+                        targets = []; // Empty = All
+                    } else {
+                        if (this.selected.length === 0) return;
+                        if (!confirm(`Launch ${this.selected.length} nodes on GitHub Infinity Pool?`)) return;
+                        targets = this.selected;
+                    }
 
                     try {
                         const res = await fetch('/api/github-launch', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ targets: this.selected })
+                            body: JSON.stringify({ targets })
                         });
                         const data = await res.json();
                         if (data.error) throw new Error(data.error);

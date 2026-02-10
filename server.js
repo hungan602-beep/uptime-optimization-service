@@ -155,12 +155,24 @@ app.post('/api/github-launch', (req, res) => {
                 return res.status(500).json({ error: "Failed to read git remote." });
             }
 
-            // Extract token: https://TOKEN@github.com...
-            const match = stdout.match(/https:\/\/([^@]+)@github\.com/);
-            if (!match || !match[1]) {
-                return res.status(500).json({ error: "No GitHub token found in git remote." });
+            console.log("Git Remote Output:", stdout); // Debugging
+
+            let token = null;
+
+            // Pattern 1: Standard URL (https://TOKEN@github.com)
+            const urlMatch = stdout.match(/https:\/\/([^@]+)@github\.com/);
+            if (urlMatch && urlMatch[1]) token = urlMatch[1];
+
+            // Pattern 2: Explicit Token Pattern (ghp_)
+            if (!token) {
+                const tokenMatch = stdout.match(/(ghp_[a-zA-Z0-9]+)/);
+                if (tokenMatch && tokenMatch[1]) token = tokenMatch[1];
             }
-            const token = match[1];
+
+            if (!token) {
+                console.error("No token found in:", stdout);
+                return res.status(500).json({ error: "No GitHub token found in git remote. Please ensure you pushed with a PAT." });
+            }
 
             // 2. Call GitHub API
             const data = JSON.stringify({
