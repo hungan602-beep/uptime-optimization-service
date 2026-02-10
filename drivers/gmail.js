@@ -2,7 +2,7 @@
 const BaseDriver = require('../core/driver_interface');
 const nodemailer = require('nodemailer');
 const imap = require('imap-simple');
-const simpleParser = require('simple-parser');
+const { simpleParser } = require('mailparser');
 
 class GmailDriver extends BaseDriver {
     constructor(account) {
