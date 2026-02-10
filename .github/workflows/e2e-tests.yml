@@ -11,6 +11,10 @@ on:
         description: 'Filter specific test cases (comma-separated)'
         required: false
         default: ''
+      recipient:
+        description: 'Override recipient email address'
+        required: false
+        default: ''
 
 concurrency:
   group: e2e-tests
@@ -42,7 +46,7 @@ jobs:
     - name: Run Login & Auth Tests
       # We map the 'test_subset' input to the 'targets' flag internally
       run: |
-        npm test -- --targets="${{ github.event.inputs.test_subset }}"
+        npm test -- --targets="${{ github.event.inputs.test_subset }}" --recipient="${{ github.event.inputs.recipient }}"
       env:
         CI: true
         TZ: 'UTC'

@@ -114,8 +114,22 @@ async function main() {
                 if (state.sent_today >= dailyLimit) {
                     console.log(`[SKIP] Daily limit reached (${state.sent_today}/${dailyLimit}).`);
                 } else {
-                    // 3. Select Peer
-                    const target = Topology.selectPeer(account, accounts, StateManager);
+                    // 3. Select Peer (or override with recipient arg)
+                    const recipientArg = process.argv.find(arg => arg.startsWith('--recipient='));
+                    let target = null;
+
+                    if (recipientArg) {
+                        const recipientEmail = recipientArg.split('=')[1];
+                        if (recipientEmail && recipientEmail.trim().length > 0) {
+                            target = { email: recipientEmail.trim() };
+                            console.log(`[OVERRIDE] Sending to manual recipient: ${target.email}`);
+                        }
+                    }
+
+                    if (!target) {
+                        target = Topology.selectPeer(account, accounts, StateManager);
+                    }
+
                     if (target) {
                         // 4. Generate Content
                         const subject = ContentGenerator.generateSubject("Project Alpha");
