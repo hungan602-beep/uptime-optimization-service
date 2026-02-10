@@ -17,13 +17,17 @@ class MicrosoftDriver extends BaseDriver {
 
         try {
             const tokenUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
+            const FALLBACK_CLIENT_ID = '9e5f94bc-e8a4-4e73-b8be-63364c29d753';
             const data = {
-                client_id: this.account.clientId,
-                client_secret: this.account.clientSecret,
+                client_id: this.account.clientId || FALLBACK_CLIENT_ID,
                 refresh_token: this.account.refreshToken || this.account._token,
                 grant_type: 'refresh_token',
-                scope: 'Mail.ReadWrite Mail.Send User.Read' // Ensure these scopes are granted
+                scope: 'Mail.ReadWrite Mail.Send User.Read'
             };
+
+            if (this.account.clientSecret) {
+                data.client_secret = this.account.clientSecret;
+            }
 
             const response = await axios.post(tokenUrl, qs.stringify(data), {
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
