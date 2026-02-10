@@ -72,10 +72,7 @@ app.post('/api/control', (req, res) => {
     res.json({ success: true, affected: targets.length });
 });
 
-// Serve the NEW Dashboard
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard_v2.html'));
-});
+
 
 // Start Server
 app.listen(PORT, () => {
