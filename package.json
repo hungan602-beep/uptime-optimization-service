@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "start": "node server.js",
+    "update": "git pull && node server.js"
+  },
   "dependencies": {
     "axios": "^1.13.5",
     "express": "^5.2.1",
