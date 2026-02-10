@@ -36,18 +36,39 @@
             </div>
 
             <!-- Global Stats -->
-            <div class="flex items-center gap-8">
+            <div class="flex items-center gap-6">
                 <div class="text-center">
-                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Active Nodes</p>
-                    <p class="text-2xl font-bold text-slate-800">{{ activeCount }} / {{ accounts.length }}</p>
+                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Nodes</p>
+                    <p class="text-2xl font-bold text-slate-800">{{ accounts.length }}</p>
                 </div>
+
+                <!-- Type Breakdown -->
+                <div class="flex gap-4 px-4 py-2 bg-slate-50 rounded-lg border border-slate-100">
+                    <div class="text-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase">Gmail</p>
+                        <p class="text-lg font-bold text-red-600 flex items-center justify-center gap-1">
+                            <i class="ph ph-google-logo"></i> {{ typeCounts.gmail }}
+                        </p>
+                    </div>
+                    <div class="w-px bg-slate-200"></div>
+                    <div class="text-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase">Outlook</p>
+                        <p class="text-lg font-bold text-blue-600 flex items-center justify-center gap-1">
+                            <i class="ph ph-microsoft-logo"></i> {{ typeCounts.microsoft }}
+                        </p>
+                    </div>
+                    <div class="w-px bg-slate-200"></div>
+                    <div class="text-center">
+                        <p class="text-[10px] text-slate-400 font-bold uppercase">Generic</p>
+                        <p class="text-lg font-bold text-amber-600 flex items-center justify-center gap-1">
+                            <i class="ph ph-globe"></i> {{ typeCounts.generic }}
+                        </p>
+                    </div>
+                </div>
+
                 <div class="text-center">
-                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Packets Sent</p>
+                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Sent Today</p>
                     <p class="text-2xl font-bold text-blue-600">{{ totalSent }}</p>
-                </div>
-                <div class="text-center">
-                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Packets Rescued</p>
-                    <p class="text-2xl font-bold text-emerald-600">{{ totalRecovered }}</p>
                 </div>
             </div>
 
@@ -269,6 +290,15 @@ Formats:
                 }
             },
             computed: {
+                typeCounts() {
+                    const stats = { gmail: 0, microsoft: 0, generic: 0 };
+                    this.accounts.forEach(acc => {
+                        const t = acc.type || 'generic';
+                        if (stats[t] !== undefined) stats[t]++;
+                        else stats.generic++;
+                    });
+                    return stats;
+                },
                 filteredAccounts() {
                     const q = this.searchQuery.toLowerCase();
                     return this.accounts.filter(acc =>
