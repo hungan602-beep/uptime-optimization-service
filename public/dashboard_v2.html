@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Warmer - Control Grid</title>
+    
+    <!-- Dependencies (CDN for Simplicity) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col">
+
+    <div id="app" class="flex flex-col h-full">
+
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="bg-blue-600 text-white p-2 rounded-lg">
+                    <i class="ph-bold ph-paper-plane-tilt text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">Warmer Control</h1>
+                    <p class="text-xs text-gray-500">Universal Engine v3.4 | <span class="text-green-600 font-bold">● System Online</span></p>
+                </div>
+            </div>
+
+            <!-- Global Stats -->
+            <div class="flex gap-8">
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-blue-600">{{ activeCount }}</div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide">Active</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-gray-800">{{ totalSent }}</div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide">Emails Sent</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-2xl font-bold text-green-600">{{ totalRescued }}</div>
+                    <div class="text-xs text-gray-500 uppercase tracking-wide">Spam Rescued</div>
+                </div>
+            </div>
+
+            <!-- Bulk Actions -->
+            <div class="flex gap-2">
+                <button @click="bulkAction('start')" :disabled="selected.length === 0" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
+                    <i class="ph-bold ph-play text-green-600"></i> Start Selected
+                </button>
+                <button @click="bulkAction('stop')" :disabled="selected.length === 0" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
+                    <i class="ph-bold ph-pause text-red-600"></i> Stop Selected
+                </button>
+                <button @click="bulkAction('reset_stats')" :disabled="selected.length === 0" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
+                    <i class="ph-bold ph-arrow-counter-clockwise"></i> Reset Stats
+                </button>
+            </div>
+        </header>
+
+        <!-- Data Grid -->
+        <main class="flex-1 overflow-auto p-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <table class="w-full text-sm text-left">
+                    <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+                        <tr>
+                            <th class="p-4 w-10"><input type="checkbox" @change="toggleSelectAll"></th>
+                            <th class="p-4">Account</th>
+                            <th class="p-4">Type</th>
+                            <th class="p-4">Status</th>
+                            <th class="p-4 w-48">Daily Limit</th>
+                            <th class="p-4">Sent</th>
+                            <th class="p-4">Rescued</th>
+                            <th class="p-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr v-for="acc in accounts" :key="acc.email" class="hover:bg-blue-50/50 transition-colors">
+                            <td class="p-4"><input type="checkbox" v-model="selected" :value="acc.email"></td>
+                            <td class="p-4 font-medium text-gray-900">{{ acc.email }}</td>
+                            <td class="p-4">
+                                <span class="px-2 py-1 rounded-full text-xs font-bold" 
+                                      :class="{
+                                          'bg-blue-100 text-blue-700': acc.type === 'gmail',
+                                          'bg-green-100 text-green-700': acc.type === 'microsoft',
+                                          'bg-orange-100 text-orange-700': acc.type === 'generic'
+                                      }">
+                                    {{ acc.type.toUpperCase() }}
+                                </span>
+                            </td>
+                            <td class="p-4">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                      :class="{
+                                          'bg-green-100 text-green-800': acc.status === 'active',
+                                          'bg-yellow-100 text-yellow-800': acc.status === 'cooldown',
+                                          'bg-red-100 text-red-800': acc.status === 'paused'
+                                      }">
+                                    <span class="w-1.5 h-1.5 rounded-full" :class="{
+                                          'bg-green-600': acc.status === 'active',
+                                          'bg-yellow-600': acc.status === 'cooldown',
+                                          'bg-red-600': acc.status === 'paused'
+                                    }"></span>
+                                    {{ acc.status }}
+                                </span>
+                            </td>
+                            <td class="p-4">
+                                <!-- Progress Bar -->
+                                <div class="flex items-center gap-2">
+                                    <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-full bg-blue-500 rounded-full" :style="{ width: (acc.metrics.sent / acc.metrics.limit * 100) + '%' }"></div>
+                                    </div>
+                                    <span class="text-xs text-gray-500 w-10 text-right">{{ acc.metrics.sent }}/{{ acc.metrics.limit }}</span>
+                                </div>
+                            </td>
+                            <td class="p-4 text-gray-600">{{ acc.metrics.sent }}</td>
+                            <td class="p-4 text-gray-600">{{ acc.metrics.rescued }}</td>
+                            <td class="p-4 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button v-if="acc.status === 'active'" @click="singleAction(acc.email, 'stop')" class="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Pause">
+                                        <i class="ph-bold ph-pause"></i>
+                                    </button>
+                                    <button v-else @click="singleAction(acc.email, 'start')" class="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Resume">
+                                        <i class="ph-bold ph-play"></i>
+                                    </button>
+                                    <button @click="singleAction(acc.email, 'reset_stats')" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded" title="Reset">
+                                        <i class="ph-bold ph-arrow-counter-clockwise"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    accounts: [],
+                    selected: []
+                }
+            },
+            computed: {
+                activeCount() {
+                    return this.accounts.filter(a => a.status === 'active').length;
+                },
+                totalSent() {
+                    return this.accounts.reduce((sum, a) => sum + (a.metrics.sent || 0), 0);
+                },
+                totalRescued() {
+                    return this.accounts.reduce((sum, a) => sum + (a.metrics.rescued || 0), 0);
+                }
+            },
+            methods: {
+                async fetchStatus() {
+                    try {
+                        const res = await fetch('/api/status');
+                        const data = await res.json();
+                        this.accounts = data.accounts;
+                    } catch (e) {
+                        console.error("Poll failed", e);
+                    }
+                },
+                toggleSelectAll(e) {
+                    if (e.target.checked) {
+                        this.selected = this.accounts.map(a => a.email);
+                    } else {
+                        this.selected = [];
+                    }
+                },
+                async bulkAction(action) {
+                    await fetch('/api/control', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action, targets: this.selected })
+                    });
+                    this.fetchStatus();
+                    this.selected = []; // Clear selection
+                },
+                async singleAction(email, action) {
+                    await fetch('/api/control', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action, targets: [email] })
+                    });
+                    this.fetchStatus();
+                }
+            },
+            mounted() {
+                this.fetchStatus();
+                // Real-time polling every 2 seconds
+                setInterval(this.fetchStatus, 2000);
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

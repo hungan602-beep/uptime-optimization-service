@@ -1,0 +1,10 @@
+{
+  "undefined": {
+    "sent_today": 0,
+    "rescued_today": 0,
+    "last_run": null,
+    "status": "active",
+    "cooldown_until": null,
+    "bounces_today": 0
+  }
+}

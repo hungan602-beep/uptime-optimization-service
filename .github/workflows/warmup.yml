@@ -1,0 +1,57 @@
+name: Universal Warmer
+
+on:
+  schedule:
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+
+# PREVENT CONCURRENCY
+# Only one run at a time. If a new one starts, don't cancel the old one (let it finish), but rely on queue.
+# Actually, 'cancel-in-progress: false' is default. We just want to group them.
+concurrency: 
+  group: warmup-engine
+  cancel-in-progress: false
+
+jobs:
+  warmup:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Inject Configuration (Secure)
+      # We write the secret content to the config file at runtime.
+      # It is never committed.
+      run: |
+        echo '${{ secrets.ACCOUNTS_JSON }}' > config/accounts.json
+      shell: bash
+
+    - name: Run Warmer Engine
+      run: node index.js
+      env:
+        # Timezone for the runner to ensure consistent 'Date' operations if needed
+        TZ: 'UTC'
+
+    - name: Commit State Changes
+      # Only commit state.json if it changed
+      run: |
+        git config --global user.name 'Warmup Bot'
+        git config --global user.email 'bot@noreply.github.com'
+        git add core/state.json || true
+        git commit -m "Update state [skip ci]" || echo "No changes to commit"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
