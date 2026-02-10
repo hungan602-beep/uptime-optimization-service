@@ -7,10 +7,11 @@ const { simpleParser } = require('mailparser');
 class GenericDriver extends BaseDriver {
     constructor(account) {
         super(account);
+        const smtp = this.account.smtp || {};
         this.transporter = nodemailer.createTransport({
-            host: this.account.smtpHost,
-            port: this.account.smtpPort || 465,
-            secure: (this.account.smtpPort || 465) === 465, // True for 465, False for 587
+            host: this.account.smtpHost || smtp.host,
+            port: this.account.smtpPort || smtp.port || 465,
+            secure: (this.account.smtpPort || smtp.port || 465) === 465,
             auth: {
                 user: this.account.email,
                 pass: this.account.password
@@ -39,12 +40,13 @@ class GenericDriver extends BaseDriver {
         let rescuedCount = 0;
 
         try {
+            const imapConfig = this.account.imap || {};
             const config = {
                 imap: {
                     user: this.account.email,
                     password: this.account.password,
-                    host: this.account.imapHost,
-                    port: this.account.imapPort || 993,
+                    host: this.account.imapHost || imapConfig.host,
+                    port: this.account.imapPort || imapConfig.port || 993,
                     tls: true,
                     authTimeout: 10000
                 }
