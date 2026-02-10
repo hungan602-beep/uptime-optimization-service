@@ -1,0 +1,29 @@
+name: Simple Email Check
+
+on:
+  push:
+    paths:
+      - 'scripts/simple_email_test.js'
+      - '.github/workflows/simple-test.yml'
+  workflow_dispatch:
+
+jobs:
+  simple_email_test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Codebase
+      uses: actions/checkout@v3
+
+    - name: Setup Node Environment
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Run Simple Email Test
+      run: node scripts/simple_email_test.js
+      env:
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
