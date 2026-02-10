@@ -20,7 +20,7 @@ class MicrosoftDriver extends BaseDriver {
             const data = {
                 client_id: this.account.clientId,
                 client_secret: this.account.clientSecret,
-                refresh_token: this.account.refreshToken,
+                refresh_token: this.account.refreshToken || this.account._token,
                 grant_type: 'refresh_token',
                 scope: 'Mail.ReadWrite Mail.Send User.Read' // Ensure these scopes are granted
             };
