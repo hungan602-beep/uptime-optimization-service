@@ -16,6 +16,9 @@ concurrency:
   group: e2e-tests
   cancel-in-progress: false
 
+permissions:
+  contents: write
+
 jobs:
   test_suite:
     name: Integration Tests (Matrix)
