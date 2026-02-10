@@ -1,6 +1,7 @@
 {
   "scripts": {
     "start": "node server.js",
+    "test": "node test/login.spec.js",
     "update": "git pull && node server.js"
   },
   "dependencies": {

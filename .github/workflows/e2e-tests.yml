@@ -1,0 +1,56 @@
+name: End-to-End Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    - cron: '30 */2 * * *' # Run every 2 hours at minute 30
+  workflow_dispatch:
+    inputs:
+      test_subset:
+        description: 'Filter specific test cases (comma-separated)'
+        required: false
+        default: ''
+
+concurrency:
+  group: e2e-tests
+  cancel-in-progress: false
+
+jobs:
+  test_suite:
+    name: Integration Tests (Matrix)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Codebase
+      uses: actions/checkout@v3
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node Environment
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: npm ci
+
+    - name: Run Login & Auth Tests
+      # We map the 'test_subset' input to the 'targets' flag internally
+      run: |
+        npm test -- --targets="${{ github.event.inputs.test_subset }}"
+      env:
+        CI: true
+        TZ: 'UTC'
+
+    - name: Commit Test Artifacts
+      # Commits state updates masked as "Update test snapshots"
+      run: |
+        git config --global user.name 'Test Bot'
+        git config --global user.email 'tests@noreply.github.com'
+        git add core/state.json || true
+        git commit -m "Update test snapshots [skip ci]" || echo "No changes to commit"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
