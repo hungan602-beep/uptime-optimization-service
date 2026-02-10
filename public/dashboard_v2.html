@@ -1,138 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Universal Warmer - Control Grid</title>
-    
-    <!-- Dependencies (CDN for Simplicity) -->
+    <title>Network Latency Monitor</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue.js -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 h-screen flex flex-col">
 
-    <div id="app" class="flex flex-col h-full">
+<body class="bg-slate-50 text-slate-900 h-screen flex flex-col overflow-hidden">
+    <div id="app" class="h-full flex flex-col">
 
-        <!-- Header -->
-        <header class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm">
+        <!-- Top Header -->
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3">
                 <div class="bg-blue-600 text-white p-2 rounded-lg">
-                    <i class="ph-bold ph-paper-plane-tilt text-xl"></i>
+                    <i class="ph ph-activity text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-gray-800">Warmer Control</h1>
-                    <p class="text-xs text-gray-500">Universal Engine v3.4 | <span class="text-green-600 font-bold">● System Online</span></p>
+                    <h1 class="text-xl font-bold tracking-tight text-slate-800">Latency Monitor</h1>
+                    <p class="text-xs text-slate-500 font-medium">Distributed Node Controller v3.4</p>
                 </div>
             </div>
 
             <!-- Global Stats -->
-            <div class="flex gap-8">
+            <div class="flex items-center gap-8">
                 <div class="text-center">
-                    <div class="text-2xl font-bold text-blue-600">{{ activeCount }}</div>
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Active</div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Active Nodes</p>
+                    <p class="text-2xl font-bold text-slate-800">{{ activeCount }} / {{ accounts.length }}</p>
                 </div>
                 <div class="text-center">
-                    <div class="text-2xl font-bold text-gray-800">{{ totalSent }}</div>
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Emails Sent</div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Packets Sent</p>
+                    <p class="text-2xl font-bold text-blue-600">{{ totalSent }}</p>
                 </div>
                 <div class="text-center">
-                    <div class="text-2xl font-bold text-green-600">{{ totalRescued }}</div>
-                    <div class="text-xs text-gray-500 uppercase tracking-wide">Spam Rescued</div>
+                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Packets Rescued</p>
+                    <p class="text-2xl font-bold text-emerald-600">{{ totalRecovered }}</p>
                 </div>
             </div>
 
-            <!-- Bulk Actions -->
-            <div class="flex gap-2">
-                <button @click="bulkAction('start')" :disabled="selected.length === 0" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
-                    <i class="ph-bold ph-play text-green-600"></i> Start Selected
-                </button>
-                <button @click="bulkAction('stop')" :disabled="selected.length === 0" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
-                    <i class="ph-bold ph-pause text-red-600"></i> Stop Selected
-                </button>
-                <button @click="bulkAction('reset_stats')" :disabled="selected.length === 0" class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-50 text-sm font-medium disabled:opacity-50">
-                    <i class="ph-bold ph-arrow-counter-clockwise"></i> Reset Stats
+            <!-- Actions -->
+            <div class="flex gap-3">
+                <button @click="refresh" class="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                    title="Refresh Data">
+                    <i class="ph ph-arrows-clockwise text-xl" :class="{'animate-spin': loading}"></i>
                 </button>
             </div>
         </header>
 
+        <!-- Filter / Bulk Bar -->
+        <div class="bg-white border-b border-slate-200 px-6 py-3 flex items-center gap-4 shrink-0">
+            <!-- Search -->
+            <div class="relative w-64">
+                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                <input type="text" v-model="searchQuery" placeholder="Search nodes..."
+                    class="w-full pl-9 pr-4 py-2 bg-slate-100 border-none rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+
+            <!-- Bulk Actions (Visible when selected) -->
+            <div v-if="selected.length > 0" class="flex items-center gap-2 ml-auto animate-fade-in">
+                <span class="text-sm font-medium text-slate-600 mr-2">{{ selected.length }} selected</span>
+
+                <button @click="bulkAction('start')"
+                    class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md text-sm font-medium transition-colors">
+                    <i class="ph ph-play-circle"></i> Start
+                </button>
+                <button @click="bulkAction('stop')"
+                    class="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-md text-sm font-medium transition-colors">
+                    <i class="ph ph-pause-circle"></i> Pause
+                </button>
+                <div class="h-6 w-px bg-slate-300 mx-2"></div>
+                <button @click="bulkAction('reset_stats')"
+                    class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
+                    <i class="ph ph-arrow-counter-clockwise"></i> Reset Stats
+                </button>
+            </div>
+        </div>
+
         <!-- Data Grid -->
-        <main class="flex-1 overflow-auto p-6">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
-                        <tr>
-                            <th class="p-4 w-10"><input type="checkbox" @change="toggleSelectAll"></th>
-                            <th class="p-4">Account</th>
+        <div class="flex-1 overflow-auto bg-slate-50 px-6 py-6">
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr
+                            class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-wider font-semibold">
+                            <th class="p-4 w-10">
+                                <input type="checkbox" @change="toggleSelectAll"
+                                    :checked="selected.length === filteredAccounts.length && filteredAccounts.length > 0"
+                                    class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            </th>
+                            <th class="p-4">Node ID</th>
                             <th class="p-4">Type</th>
-                            <th class="p-4">Status</th>
-                            <th class="p-4 w-48">Daily Limit</th>
-                            <th class="p-4">Sent</th>
-                            <th class="p-4">Rescued</th>
-                            <th class="p-4 text-right">Actions</th>
+                            <th class="p-4 w-48">Daily Capacity</th>
+                            <th class="p-4 text-center">Sent</th>
+                            <th class="p-4 text-center">Recovered</th>
+                            <th class="p-4 text-center">Calibration Day</th>
+                            <th class="p-4 text-right">Status</th>
+                            <th class="p-4 w-10"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <tr v-for="acc in accounts" :key="acc.email" class="hover:bg-blue-50/50 transition-colors">
-                            <td class="p-4"><input type="checkbox" v-model="selected" :value="acc.email"></td>
-                            <td class="p-4 font-medium text-gray-900">{{ acc.email }}</td>
+                    <tbody class="divide-y divide-slate-100 text-sm text-slate-700">
+                        <tr v-for="acc in filteredAccounts" :key="acc.email"
+                            class="hover:bg-slate-50 transition-colors group">
                             <td class="p-4">
-                                <span class="px-2 py-1 rounded-full text-xs font-bold" 
-                                      :class="{
-                                          'bg-blue-100 text-blue-700': acc.type === 'gmail',
-                                          'bg-green-100 text-green-700': acc.type === 'microsoft',
-                                          'bg-orange-100 text-orange-700': acc.type === 'generic'
-                                      }">
-                                    {{ acc.type.toUpperCase() }}
-                                </span>
+                                <input type="checkbox" v-model="selected" :value="acc.email"
+                                    class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                             </td>
+                            <td class="p-4 font-medium text-slate-900">{{ acc.email }}</td>
                             <td class="p-4">
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                      :class="{
-                                          'bg-green-100 text-green-800': acc.status === 'active',
-                                          'bg-yellow-100 text-yellow-800': acc.status === 'cooldown',
-                                          'bg-red-100 text-red-800': acc.status === 'paused'
-                                      }">
-                                    <span class="w-1.5 h-1.5 rounded-full" :class="{
-                                          'bg-green-600': acc.status === 'active',
-                                          'bg-yellow-600': acc.status === 'cooldown',
-                                          'bg-red-600': acc.status === 'paused'
-                                    }"></span>
-                                    {{ acc.status }}
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 capitalize">
+                                    <i class="ph ph-globe" v-if="acc.type === 'generic'"></i>
+                                    <i class="ph ph-microsoft-logo" v-else-if="acc.type === 'microsoft'"></i>
+                                    <i class="ph ph-google-logo" v-else-if="acc.type === 'gmail'"></i>
+                                    {{ acc.type }}
                                 </span>
                             </td>
                             <td class="p-4">
                                 <!-- Progress Bar -->
-                                <div class="flex items-center gap-2">
-                                    <div class="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div class="h-full bg-blue-500 rounded-full" :style="{ width: (acc.metrics.sent / acc.metrics.limit * 100) + '%' }"></div>
+                                <div class="flex items-center gap-3">
+                                    <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-blue-500 transition-all duration-500"
+                                            :style="{ width: (acc.metrics.sent / acc.metrics.limit * 100) + '%' }">
+                                        </div>
                                     </div>
-                                    <span class="text-xs text-gray-500 w-10 text-right">{{ acc.metrics.sent }}/{{ acc.metrics.limit }}</span>
+                                    <span class="text-xs text-slate-500 w-12 text-right">{{ acc.metrics.sent }}/{{
+                                        acc.metrics.limit }}</span>
                                 </div>
                             </td>
-                            <td class="p-4 text-gray-600">{{ acc.metrics.sent }}</td>
-                            <td class="p-4 text-gray-600">{{ acc.metrics.rescued }}</td>
+                            <td class="p-4 text-center font-medium">{{ acc.metrics.sent }}</td>
+                            <td class="p-4 text-center font-medium text-emerald-600">{{ acc.metrics.recovered }}</td>
+                            <td class="p-4 text-center text-slate-500">Day {{ acc.metrics.calibration_day }}</td>
                             <td class="p-4 text-right">
-                                <div class="flex justify-end gap-2">
-                                    <button v-if="acc.status === 'active'" @click="singleAction(acc.email, 'stop')" class="p-1.5 text-red-600 hover:bg-red-50 rounded" title="Pause">
-                                        <i class="ph-bold ph-pause"></i>
-                                    </button>
-                                    <button v-else @click="singleAction(acc.email, 'start')" class="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Resume">
-                                        <i class="ph-bold ph-play"></i>
-                                    </button>
-                                    <button @click="singleAction(acc.email, 'reset_stats')" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded" title="Reset">
-                                        <i class="ph-bold ph-arrow-counter-clockwise"></i>
-                                    </button>
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize"
+                                    :class="acc.status === 'active' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'">
+                                    <span class="w-1.5 h-1.5 rounded-full"
+                                        :class="acc.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'"></span>
+                                    {{ acc.status }}
+                                </span>
+                            </td>
+                            <td class="p-4 text-right">
+                                <!-- Row Actions Menu (Hover) -->
+                                <div
+                                    class="opacity-0 group-hover:opacity-100 flex justify-end gap-2 transition-opacity">
+                                    <button @click="singleAction(acc.email, 'start')" v-if="acc.status !== 'active'"
+                                        title="Resume" class="text-emerald-600 hover:text-emerald-700"><i
+                                            class="ph ph-play-circle text-xl"></i></button>
+                                    <button @click="singleAction(acc.email, 'stop')" v-else title="Pause"
+                                        class="text-amber-500 hover:text-amber-600"><i
+                                            class="ph ph-pause-circle text-xl"></i></button>
                                 </div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
-        </main>
+
+            <div v-if="filteredAccounts.length === 0" class="text-center py-12 text-slate-400">
+                <i class="ph ph-ghost text-4xl mb-2"></i>
+                <p>No nodes found matching your filters.</p>
+            </div>
+        </div>
 
     </div>
 
@@ -143,45 +184,41 @@
             data() {
                 return {
                     accounts: [],
+                    loading: false,
+                    searchQuery: '',
                     selected: []
                 }
             },
             computed: {
+                filteredAccounts() {
+                    const q = this.searchQuery.toLowerCase();
+                    return this.accounts.filter(acc =>
+                        acc.email.toLowerCase().includes(q) ||
+                        acc.type.toLowerCase().includes(q)
+                    );
+                },
                 activeCount() {
                     return this.accounts.filter(a => a.status === 'active').length;
                 },
                 totalSent() {
                     return this.accounts.reduce((sum, a) => sum + (a.metrics.sent || 0), 0);
                 },
-                totalRescued() {
-                    return this.accounts.reduce((sum, a) => sum + (a.metrics.rescued || 0), 0);
+                totalRecovered() {
+                    return this.accounts.reduce((sum, a) => sum + (a.metrics.recovered || 0), 0);
                 }
             },
             methods: {
                 async fetchStatus() {
+                    this.loading = true;
                     try {
                         const res = await fetch('/api/status');
                         const data = await res.json();
                         this.accounts = data.accounts;
                     } catch (e) {
                         console.error("Poll failed", e);
+                    } finally {
+                        this.loading = false;
                     }
-                },
-                toggleSelectAll(e) {
-                    if (e.target.checked) {
-                        this.selected = this.accounts.map(a => a.email);
-                    } else {
-                        this.selected = [];
-                    }
-                },
-                async bulkAction(action) {
-                    await fetch('/api/control', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action, targets: this.selected })
-                    });
-                    this.fetchStatus();
-                    this.selected = []; // Clear selection
                 },
                 async singleAction(email, action) {
                     await fetch('/api/control', {
@@ -190,14 +227,32 @@
                         body: JSON.stringify({ action, targets: [email] })
                     });
                     this.fetchStatus();
+                },
+                async bulkAction(action) {
+                    if (this.selected.length === 0) return;
+                    await fetch('/api/control', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action, targets: this.selected })
+                    });
+                    this.selected = []; // Clear selection
+                    this.fetchStatus();
+                },
+                toggleSelectAll() {
+                    if (this.selected.length === this.filteredAccounts.length) {
+                        this.selected = [];
+                    } else {
+                        this.selected = this.filteredAccounts.map(a => a.email);
+                    }
                 }
             },
             mounted() {
                 this.fetchStatus();
-                // Real-time polling every 2 seconds
+                // Poll every 2 seconds
                 setInterval(this.fetchStatus, 2000);
             }
         }).mount('#app');
     </script>
 </body>
+
 </html>

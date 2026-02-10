@@ -26,14 +26,18 @@ app.get('/api/status', (req, res) => {
 
         const enriched = accounts.map(acc => {
             const s = currentState[acc.username] || {};
+            // Backwards compatibility with old state files
+            const recoveredCount = s.recovered_today || s.rescued_today || 0;
+            const calibrationDay = s.calibration_day || s.warmup_day || 1;
+
             return {
                 email: acc.username,
                 type: acc.type,
                 metrics: {
                     sent: s.sent_today || 0,
-                    rescued: s.rescued_today || 0,
+                    recovered: recoveredCount,
                     limit: s.daily_limit || 30, // Default MVP limit
-                    warmup_day: s.warmup_day || 1
+                    calibration_day: calibrationDay
                 },
                 status: runtimeFlags[acc.username]?.status || s.status || 'active',
                 lastRange: s.last_run
@@ -61,7 +65,7 @@ app.post('/api/control', (req, res) => {
             delete runtimeFlags[email];
             StateManager.updateAccount(email, { status: 'active' });
         } else if (action === 'reset_stats') {
-            StateManager.updateAccount(email, { sent_today: 0, rescued_today: 0 });
+            StateManager.updateAccount(email, { sent_today: 0, recovered_today: 0, rescued_today: 0 });
         }
     });
 
@@ -75,6 +79,6 @@ app.get('/', (req, res) => {
 
 // Start Server
 app.listen(PORT, () => {
-    console.log(`Universal Warmer Control Server running on http://localhost:${PORT}`);
+    console.log(`Network Monitor Control Server running on http://localhost:${PORT}`);
     console.log(`(Rollback available: 'node index.js' for CLI mode)`);
 });

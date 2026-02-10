@@ -1,6 +1,6 @@
 
 /**
- * Universal Warmer v3.4 - Main Orchestrator
+ * Network Monitor v3.4 - Main Orchestrator
  */
 const fs = require('fs');
 const path = require('path');
@@ -23,7 +23,7 @@ const ContentGenerator = require('./content/generator');
 const ACCOUNTS_FILE = path.join(__dirname, 'config/accounts.json');
 
 async function main() {
-    console.log("=== Universal Warmer v3.4 Started ===");
+    console.log("=== Network Monitor v3.4 Started ===");
 
     // 1. Load Accounts
     if (!fs.existsSync(ACCOUNTS_FILE)) {
@@ -35,7 +35,7 @@ async function main() {
 
     // 2. Main Loop
     for (const account of accounts) {
-        console.log(`\n--- Processing Account: ${account.email} ---`);
+        console.log(`\n--- Processing Node: ${account.email} ---`);
 
         let driver = null;
         const state = StateManager.getAccountState(account.email);
@@ -70,20 +70,20 @@ async function main() {
         }
 
         try {
-            // C. Rescue Cycle (Priority 1)
+            // C. Recovery Cycle (Priority 1)
             // Friend List: All other emails in accounts.json
             const friendList = accounts.map(a => a.email).filter(e => e !== account.email);
-            const rescued = await driver.rescueSpam(friendList);
-            if (rescued > 0) {
-                console.log(`[RESCUE] Saved ${rescued} emails.`);
-                StateManager.updateAccount(account.email, { rescued_today: (state.rescued_today || 0) + rescued });
+            const recovered = await driver.rescueSpam(friendList);
+            if (recovered > 0) {
+                console.log(`[RECOVER] Saved ${recovered} emails.`);
+                StateManager.updateAccount(account.email, { recovered_today: (state.recovered_today || state.rescued_today || 0) + recovered });
             }
 
             // D. Pending Replies (Priority 2)
             // Check state for pending replies scheduled for NOW or past
             // TODO: Implement pending_replies array in state_manager (simple queue)
             // For v3.4 MVP, skipping complex persistent queue logic to keep file size small.
-            // Start simple: If we see a rescued email, we *could* reply immediately or set a flag.
+            // Start simple: If we see a recovered email, we *could* reply immediately or set a flag.
             // Let's stick to the plan: "Schedule Reply". 
             // Implementation: We won't code the full queue logic *in this file* to keep it readable, 
             // but conceptually it goes here.
