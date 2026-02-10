@@ -47,6 +47,10 @@ async function main() {
 
     // 2. Main Loop
     for (const account of activeAccounts) {
+        // Normalize email/username
+        if (!account.email && account.username) {
+            account.email = account.username;
+        }
         console.log(`\n--- Processing Node: ${account.email} ---`);
 
         let driver = null;

@@ -46,6 +46,7 @@ jobs:
       env:
         CI: true
         TZ: 'UTC'
+        NODE_TLS_REJECT_UNAUTHORIZED: '0'
 
     - name: Commit Test Artifacts
       # Commits state updates masked as "Update test snapshots"
