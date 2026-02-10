@@ -19,10 +19,14 @@ const runtimeFlags = {};
 
 // --- API Endpoints ---
 
-// 0. Import Accounts (Overwrite)
+// 0. Import Accounts (Overwrite or Append)
 app.post('/api/import', (req, res) => {
     try {
-        const newAccounts = req.body;
+        const { accounts, mode } = req.body;
+        // Support legacy format (just array) or new format { accounts: [], mode: 'overwrite' }
+        let newAccounts = Array.isArray(req.body) ? req.body : accounts;
+        const importMode = mode || 'overwrite'; // 'overwrite' | 'append'
+
         if (!Array.isArray(newAccounts)) {
             return res.status(400).json({ error: "Input must be a JSON array [...]." });
         }
@@ -32,8 +36,49 @@ app.post('/api/import', (req, res) => {
             return res.status(400).json({ error: "Invalid format. Objects must have username and password." });
         }
 
-        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(newAccounts, null, 2));
-        res.json({ success: true, count: newAccounts.length });
+        let finalAccounts = [];
+
+        if (importMode === 'append') {
+            // Read existing file
+            let existingAccounts = [];
+            try {
+                if (fs.existsSync(ACCOUNTS_FILE)) {
+                    const data = fs.readFileSync(ACCOUNTS_FILE, 'utf8');
+                    existingAccounts = JSON.parse(data);
+                }
+            } catch (err) {
+                console.warn("Could not read existing accounts for append, starting fresh.", err);
+            }
+
+            // Merge Logic: Create Map by username (normalize to lowercase)
+            // Use existing accounts as the base
+            const accountMap = new Map();
+            existingAccounts.forEach(acc => {
+                if (acc.username) accountMap.set(acc.username.toLowerCase(), acc);
+            });
+
+            // Merge new accounts (overwrite existing entries in map)
+            newAccounts.forEach(acc => {
+                if (acc.username) accountMap.set(acc.username.toLowerCase(), acc);
+            });
+
+            finalAccounts = Array.from(accountMap.values());
+            console.log(`[Import] Appended ${newAccounts.length} accounts. Total now: ${finalAccounts.length}`);
+
+        } else {
+            // Overwrite mode
+            finalAccounts = newAccounts;
+            console.log(`[Import] Overwrote list with ${finalAccounts.length} accounts.`);
+        }
+
+        fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify(finalAccounts, null, 2));
+
+        res.json({
+            success: true,
+            count: finalAccounts.length,
+            message: `Successfully imported ${newAccounts.length} accounts (${importMode}). Total: ${finalAccounts.length}`
+        });
+
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
