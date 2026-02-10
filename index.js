@@ -33,8 +33,20 @@ async function main() {
     const accounts = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf8'));
     console.log(`Loaded ${accounts.length} accounts.`);
 
+    // Filter by targets if provided via CLI args
+    const targetArg = process.argv.find(arg => arg.startsWith('--targets='));
+    let activeAccounts = accounts;
+    if (targetArg) {
+        const rawTargets = targetArg.split('=')[1];
+        if (rawTargets && rawTargets.trim().length > 0) {
+            const targets = rawTargets.split(',').map(t => t.trim().toLowerCase());
+            activeAccounts = accounts.filter(a => targets.includes(a.username.toLowerCase()));
+            console.log(`[FILTER] Running for ${activeAccounts.length} selected targets.`);
+        }
+    }
+
     // 2. Main Loop
-    for (const account of accounts) {
+    for (const account of activeAccounts) {
         console.log(`\n--- Processing Node: ${account.email} ---`);
 
         let driver = null;

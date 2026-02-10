@@ -110,6 +110,10 @@
                     class="flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-md text-sm font-medium transition-colors">
                     <i class="ph ph-pause-circle"></i> Pause
                 </button>
+                <button @click="launchOnGithub()"
+                    class="flex items-center gap-2 px-3 py-1.5 bg-slate-800 text-white hover:bg-slate-900 rounded-md text-sm font-medium transition-colors shadow-sm ml-2">
+                    <i class="ph ph-github-logo"></i> Launch on GitHub
+                </button>
                 <div class="h-6 w-px bg-slate-300 mx-2"></div>
                 <button @click="bulkAction('reset_stats')"
                     class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
@@ -435,6 +439,24 @@ Formats:
                     });
                     this.selected = []; // Clear selection
                     this.fetchStatus();
+                },
+                async launchOnGithub() {
+                    if (this.selected.length === 0) return;
+                    if (!confirm(`Launch ${this.selected.length} nodes on GitHub Infinity Pool?`)) return;
+
+                    try {
+                        const res = await fetch('/api/github-launch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ targets: this.selected })
+                        });
+                        const data = await res.json();
+                        if (data.error) throw new Error(data.error);
+                        alert(`Successfully launched on GitHub!\nWorkflow ID: ${data.run_id || 'Pending'}\nInspect 'Actions' tab on GitHub.`);
+                        this.selected = [];
+                    } catch (e) {
+                        alert("GitHub Launch Failed: " + e.message);
+                    }
                 },
                 toggleSelectAll() {
                     if (this.selected.length === this.filteredAccounts.length) {

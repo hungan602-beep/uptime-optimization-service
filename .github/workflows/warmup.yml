@@ -6,6 +6,11 @@ on:
     - cron: '0 * * * *'
   # Allow manual trigger
   workflow_dispatch:
+    inputs:
+      targets:
+        description: 'Specific emails to run (comma-separated, empty for all)'
+        required: false
+        default: ''
 
 # PREVENT CONCURRENCY
 # Only one run at a time. If a new one starts, don't cancel the old one (let it finish), but rely on queue.
@@ -35,7 +40,7 @@ jobs:
 
 
     - name: Run Warmer Engine
-      run: node index.js
+      run: node index.js --targets="${{ github.event.inputs.targets }}"
       env:
         # Timezone for the runner to ensure consistent 'Date' operations if needed
         TZ: 'UTC'

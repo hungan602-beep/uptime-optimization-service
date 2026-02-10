@@ -140,6 +140,76 @@ app.post('/api/control', (req, res) => {
 
 
 
+const https = require('https');
+const { exec } = require('child_process');
+
+app.post('/api/github-launch', (req, res) => {
+    try {
+        const { targets } = req.body;
+        console.log(`[GitHub Launch] Request for ${targets.length} targets.`);
+
+        // 1. Get Token from Git Remote
+        exec('git remote -v', (err, stdout, stderr) => {
+            if (err) {
+                console.error("Git Remote Error:", err);
+                return res.status(500).json({ error: "Failed to read git remote." });
+            }
+
+            // Extract token: https://TOKEN@github.com...
+            const match = stdout.match(/https:\/\/([^@]+)@github\.com/);
+            if (!match || !match[1]) {
+                return res.status(500).json({ error: "No GitHub token found in git remote." });
+            }
+            const token = match[1];
+
+            // 2. Call GitHub API
+            const data = JSON.stringify({
+                ref: 'main',
+                inputs: {
+                    targets: targets.join(',')
+                }
+            });
+
+            const options = {
+                hostname: 'api.github.com',
+                path: '/repos/KosenkoMax/network-latency-monitor/actions/workflows/warmup.yml/dispatches',
+                method: 'POST',
+                headers: {
+                    'User-Agent': 'Node.js',
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                    'Content-Length': data.length
+                }
+            };
+
+            const ghReq = https.request(options, (ghRes) => {
+                let body = '';
+                ghRes.on('data', chunk => body += chunk);
+                ghRes.on('end', () => {
+                    if (ghRes.statusCode >= 200 && ghRes.statusCode < 300) {
+                        res.json({ success: true, message: "Workflow dispatched.", run_id: "queued" });
+                    } else {
+                        console.error("GitHub API Error:", ghRes.statusCode, body);
+                        res.status(500).json({ error: `GitHub API Error: ${ghRes.statusCode} - ${body}` });
+                    }
+                });
+            });
+
+            ghReq.on('error', (e) => {
+                console.error("Request Error:", e);
+                res.status(500).json({ error: e.message });
+            });
+
+            ghReq.write(data);
+            ghReq.end();
+        });
+
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Start Server
 app.listen(PORT, () => {
     console.log(`Network Monitor Control Server running on http://localhost:${PORT}`);
