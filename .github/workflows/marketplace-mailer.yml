@@ -13,8 +13,8 @@ jobs:
         with:
           server_address: eforemys.com.tr
           server_port: 465
-          username: info@eforemys.com.tr
-          password: 'EMYSEfor85248*'
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
           subject: Test Email (Marketplace Action)
           body: This is a test email sent via simple Marketplace Action (dawidd6/action-send-mail).
           to: muhammadriaz389900@gmail.com
