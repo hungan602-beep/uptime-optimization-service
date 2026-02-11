@@ -1,0 +1,22 @@
+name: Marketplace Mailer
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  send_mail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send mail
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: eforemys.com.tr
+          server_port: 465
+          username: info@eforemys.com.tr
+          password: 'EMYSEfor85248*'
+          subject: Test Email (Marketplace Action)
+          body: This is a test email sent via simple Marketplace Action (dawidd6/action-send-mail).
+          to: muhammadriaz389900@gmail.com
+          from: info@eforemys.com.tr
+          secure: true
