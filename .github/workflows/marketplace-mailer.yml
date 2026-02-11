@@ -11,12 +11,12 @@ jobs:
       - name: Send mail
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: tunyasystems.co.ke
+          server_address: solana.ao
           server_port: 465
-          username: omondi@tunyasystems.co.ke
-          password: 'Gorm@hia1968'
-          subject: Test Email from Omondi (Marketplace Action)
-          body: This is a test email sent from tunyasystems.co.ke via Marketplace Action.
+          username: recrutamento@sollana.ao
+          password: 'Solana.2020'
+          subject: Test Email from Recrutamento (Marketplace Action)
+          body: This is a test email sent from solana.ao via Marketplace Action.
           to: oqayuve892@gmail.com
-          from: omondi@tunyasystems.co.ke
+          from: recrutamento@sollana.ao
           secure: true
