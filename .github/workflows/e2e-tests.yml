@@ -39,8 +39,6 @@ jobs:
         shard: [1, 2, 3, 4, 5]
       fail-fast: false
       max-parallel: 5
-      fail-fast: false
-      max-parallel: 5
     
     steps:
     - name: Checkout Codebase
