@@ -29,7 +29,9 @@ const payload = JSON.stringify({
     ref: 'main',
     inputs: {
         test_subset: 'info@eforemys.com.tr', // The sender (Generic account)
-        recipient: 'shahidjaved832@gmail.com' // The manual recipient
+        recipient: 'muhammadriaz389900@gmail.com', // The manual recipient
+        proxy_url: '',  // Optional proxy
+        matrix_count: '1' // Trigger 1 shard per OS
     }
 });
 
@@ -48,7 +50,8 @@ const options = {
 
 console.log(`Triggering workflow on ${repo}...`);
 console.log(`Sender: info@eforemys.com.tr`);
-console.log(`Recipient: shahidjaved832@gmail.com`);
+console.log(`Recipient: muhammadriaz389900@gmail.com`);
+console.log(`Strategy: Multi-OS (Ubuntu + Windows)`);
 
 const req = https.request(options, (res) => {
     if (res.statusCode === 204) {
