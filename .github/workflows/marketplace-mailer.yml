@@ -13,10 +13,10 @@ jobs:
         with:
           server_address: smtp.gmail.com
           server_port: 465
-          username: aaiden85@gmail.com
-          password: 'fseggrxwidrxwwpy'
-          subject: Test Email from aaiden85 (Marketplace Action)
-          body: This is a test email sent from aaiden85@gmail.com using the excel-imported app password via Marketplace Action.
+          username: binuvvhs@gmail.com
+          password: 'lnvnmldfkopennqhe'
+          subject: Test Email from binuvvhs (Marketplace Action)
+          body: This is a test email sent from binuvvhs@gmail.com using the 41st account from Excel via Marketplace Action.
           to: oqayuve892@gmail.com
-          from: aaiden85@gmail.com
+          from: binuvvhs@gmail.com
           secure: true
