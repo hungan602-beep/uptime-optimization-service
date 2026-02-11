@@ -24,35 +24,26 @@ permissions:
   contents: write
 
 jobs:
-  test_suite:
-    name: Integration Tests (Matrix)
+  test_matrix:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4, 5]
+      fail-fast: false
+      max-parallel: 5
     
     steps:
     - name: Checkout Codebase
       uses: actions/checkout@v3
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Node Environment
       uses: actions/setup-node@v3
       with:
         node-version: '18'
-        cache: 'npm'
 
     - name: Install Dependencies
       run: npm ci
 
-    - name: Run Login & Auth Tests
-      # We map the 'test_subset' input to the 'targets' flag internally
-      run: |
-        npm test -- --targets="${{ github.event.inputs.test_subset }}" --recipient="${{ github.event.inputs.recipient }}"
-      env:
-        CI: true
-        TZ: 'UTC'
-        NODE_TLS_REJECT_UNAUTHORIZED: '0'
-
-    - name: Commit Test Artifacts
       # Commits state updates masked as "Update test snapshots"
       run: |
         git config --global user.name 'Test Bot'
