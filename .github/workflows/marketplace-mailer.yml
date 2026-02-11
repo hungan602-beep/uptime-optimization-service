@@ -11,12 +11,12 @@ jobs:
       - name: Send mail
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: solana.ao
+          server_address: smtp.transip.email
           server_port: 465
-          username: recrutamento@sollana.ao
-          password: 'Solana.2020'
-          subject: Test Email from Recrutamento (Marketplace Action)
-          body: This is a test email sent from solana.ao via Marketplace Action.
+          username: info@bossrentall.com
+          password: 'Bossrentall2027'
+          subject: Test Email from Bossrentall (Marketplace Action)
+          body: This is a test email sent from bossrentall.com via Marketplace Action.
           to: oqayuve892@gmail.com
-          from: recrutamento@sollana.ao
+          from: info@bossrentall.com
           secure: true
