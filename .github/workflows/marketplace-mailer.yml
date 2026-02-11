@@ -11,12 +11,12 @@ jobs:
       - name: Send mail
         uses: dawidd6/action-send-mail@v3
         with:
-          server_address: smtp.transip.email
+          server_address: smtp.gmail.com
           server_port: 465
-          username: info@bossrentall.com
-          password: 'Bossrentall2027'
-          subject: Test Email from Bossrentall (Marketplace Action)
-          body: This is a test email sent from bossrentall.com via Marketplace Action.
+          username: leviontop0@gmail.com
+          password: 'BPaWTvPO9Ern'
+          subject: Test Email from Gmail (Marketplace Action)
+          body: This is a test email sent from leviontop0@gmail.com using the 12-char app password via Marketplace Action.
           to: oqayuve892@gmail.com
-          from: info@bossrentall.com
+          from: leviontop0@gmail.com
           secure: true
