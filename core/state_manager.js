@@ -29,7 +29,9 @@ class StateManager {
         if (!this.state[email]) {
             this.state[email] = {
                 sent_today: 0,
-                recovered_today: 0, // renamed from rescued_today
+                recovered_today: 0,
+                replies_today: 0,
+                engaged_today: 0,
                 last_run: null,
                 status: 'active',
                 cooldown_until: null,

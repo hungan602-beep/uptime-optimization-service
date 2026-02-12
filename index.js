@@ -98,8 +98,19 @@ async function main() {
                 StateManager.updateAccount(account.email, { recovered_today: (state.recovered_today || state.rescued_today || 0) + recovered });
             }
 
-            // D. Pending Replies (Priority 2)
-            // ...
+            // D. Engagement Cycle (Priority 2) - Mark Read, Star, Reply
+            try {
+                const engagement = await driver.engageInbox(friendList);
+                if (engagement.read > 0 || engagement.starred > 0 || engagement.replied > 0) {
+                    console.log(`[ENGAGE] Read:${engagement.read} Stars:${engagement.starred} Replies:${engagement.replied}`);
+                    StateManager.updateAccount(account.email, {
+                        replies_today: (state.replies_today || 0) + engagement.replied,
+                        engaged_today: (state.engaged_today || 0) + engagement.read + engagement.starred
+                    });
+                }
+            } catch (engageErr) {
+                console.error(`[ENGAGE] Error: ${engageErr.message}`);
+            }
 
             // E. Outbound Sending (Priority 3)
             // 1. Working Hours Check

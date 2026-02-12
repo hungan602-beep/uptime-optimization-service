@@ -30,6 +30,20 @@ class ContentGenerator {
         return this.spin(subjects[Math.floor(Math.random() * subjects.length)]) + ` [Ref: ${Math.floor(Math.random() * 9999)}]`;
     }
 
+    generateReply(originalSubject) {
+        const templates = [
+            "{Thanks|Got it|Noted}! {Will check|Looking into it|On it}.",
+            "{Sounds good|Perfect|All set}. {Talk soon|Catch up later|Will follow up}.",
+            "{Great|Awesome|Nice}, {thanks for the update|appreciate it|good to know}!",
+            "{Sure|Absolutely|Of course}, {I will get back to you|let me review this|checking now}.",
+            "{Understood|Makes sense|Agreed}. {Let me know if anything changes|Keep me posted}.",
+            "{Thanks for sharing|Appreciate the heads up}! {Will review|Looking at it now}.",
+            "{Received|Got this}, {thanks|thank you}! {Quick question|One thing} - {can we discuss later|let's sync up}?",
+            "{Good stuff|Looks good}! {I'll circle back|Following up soon}."
+        ];
+        return this.spin(templates[Math.floor(Math.random() * templates.length)]);
+    }
+
     generateBody(senderName, brand) {
         const template = this.templates[Math.floor(Math.random() * this.templates.length)];
         let body = this.spin(template);

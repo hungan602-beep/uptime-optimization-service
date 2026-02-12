@@ -1,157 +1,197 @@
-
 const BaseDriver = require('../core/driver_interface');
 const axios = require('axios');
 const qs = require('qs');
+const { SocksProxyAgent } = require('socks-proxy-agent');
+const proxyConfig = require('../config/proxy');
 
 class MicrosoftDriver extends BaseDriver {
     constructor(account) {
         super(account);
+        this.email = account.username || account.email;
+        this.refreshToken = account._token;
+        this.clientId = account.client_id;
         this.accessToken = null;
-        this.tokenExpiry = 0;
-    }
 
-    async getAccessToken() {
-        if (this.accessToken && Date.now() < this.tokenExpiry) {
-            return this.accessToken;
-        }
-
-        try {
-            const tokenUrl = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
-            const FALLBACK_CLIENT_ID = '9e5f94bc-e8a4-4e73-b8be-63364c29d753';
-            const data = {
-                client_id: this.account.clientId || FALLBACK_CLIENT_ID,
-                refresh_token: this.account.refreshToken || this.account._token,
-                grant_type: 'refresh_token',
-                scope: 'Mail.ReadWrite Mail.Send User.Read'
-            };
-
-            if (this.account.clientSecret) {
-                data.client_secret = this.account.clientSecret;
-            }
-
-            const response = await axios.post(tokenUrl, qs.stringify(data), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
-
-            this.accessToken = response.data.access_token;
-            // Set expiry a bit earlier than actual (e.g., 5 mins buffer)
-            this.tokenExpiry = Date.now() + (response.data.expires_in * 1000) - 300000;
-            return this.accessToken;
-
-        } catch (error) {
-            console.error(`[Microsoft] Auth Error (${this.account.email}):`, error.response ? error.response.data : error.message);
-            throw new Error('Microsoft Auth Failed');
+        // Build proxy agent if enabled
+        this.agent = null;
+        if (proxyConfig.enabled) {
+            const proxyUrl = `socks5://${proxyConfig.userId}:${proxyConfig.password}@${proxyConfig.host}:${proxyConfig.port}`;
+            this.agent = new SocksProxyAgent(proxyUrl);
+            console.log(`[MS-Graph] Proxy: ${proxyConfig.host}`);
         }
     }
 
-    async sendEmail(to, subject, html) {
-        try {
-            const token = await this.getAccessToken();
-            const message = {
-                message: {
-                    subject: subject,
-                    body: {
-                        contentType: 'HTML',
-                        content: html
-                    },
-                    toRecipients: [
-                        {
-                            emailAddress: {
-                                address: to
-                            }
-                        }
-                    ]
+    async refreshAccessToken() {
+        const tokenUrl = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
+        const body = qs.stringify({
+            client_id: this.clientId,
+            refresh_token: this.refreshToken,
+            grant_type: 'refresh_token',
+            scope: 'https://graph.microsoft.com/.default offline_access'
+        });
+
+        const config = {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        };
+        if (this.agent) {
+            config.httpsAgent = this.agent;
+            config.httpAgent = this.agent;
+        }
+
+        const response = await axios.post(tokenUrl, body, config);
+        this.accessToken = response.data.access_token;
+        return this.accessToken;
+    }
+
+    async sendEmail(to, subject, bodyContent) {
+        // Step 1: Get fresh access token
+        await this.refreshAccessToken();
+
+        // Step 2: Send via Graph API
+        const graphUrl = 'https://graph.microsoft.com/v1.0/me/sendMail';
+        const payload = {
+            message: {
+                subject: subject,
+                body: {
+                    contentType: 'HTML',
+                    content: bodyContent
                 },
-                saveToSentItems: 'true'
-            };
+                toRecipients: [
+                    { emailAddress: { address: to } }
+                ]
+            }
+        };
 
-            await axios.post('https://graph.microsoft.com/v1.0/me/sendMail', message, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            console.log(`[Microsoft] Sent to ${to}`);
-            return true;
-        } catch (error) {
-            console.error(`[Microsoft] Send Error (${this.account.email}):`, error.response ? error.response.data : error.message);
-            throw error;
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${this.accessToken}`,
+                'Content-Type': 'application/json'
+            }
+        };
+        if (this.agent) {
+            config.httpsAgent = this.agent;
+            config.httpAgent = this.agent;
         }
+
+        const response = await axios.post(graphUrl, payload, config);
+        // HTTP 202 = success (empty body)
+        console.log(`[MS-Graph] Sent to ${to} from ${this.email} (HTTP ${response.status})`);
+        return true;
+    }
+
+    _graphConfig() {
+        const cfg = {
+            headers: { 'Authorization': `Bearer ${this.accessToken}`, 'Content-Type': 'application/json' },
+            timeout: 20000
+        };
+        if (this.agent) { cfg.httpsAgent = this.agent; cfg.httpAgent = this.agent; }
+        return cfg;
     }
 
     async rescueSpam(knownSenders) {
         let rescuedCount = 0;
         try {
-            const token = await this.getAccessToken();
+            await this.refreshAccessToken();
+            const cfg = this._graphConfig();
 
-            // 1. Get Junk Folder ID (or just use 'junkemail' well-known name)
-            // 2. List messages in Junk
-            const url = 'https://graph.microsoft.com/v1.0/me/mailFolders/junkemail/messages?$select=id,sender,subject&$top=50';
+            // Get junk email messages
+            const junkResp = await axios.get(
+                'https://graph.microsoft.com/v1.0/me/mailFolders/junkemail/messages?$top=100&$select=id,subject,from',
+                cfg
+            );
+            const junkMsgs = junkResp.data.value || [];
 
-            const response = await axios.get(url, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            const messages = response.data.value || [];
-
-            for (const msg of messages) {
-                const senderEmail = msg.sender.emailAddress.address;
-
-                // Check against friend list
-                const isFriend = knownSenders.some(friend => senderEmail.toLowerCase().includes(friend.toLowerCase()));
+            for (const msg of junkMsgs) {
+                const fromAddr = msg.from && msg.from.emailAddress ? msg.from.emailAddress.address : '';
+                const isFriend = knownSenders.some(f => fromAddr.includes(f) || (msg.subject || '').includes(f));
 
                 if (isFriend) {
-                    console.log(`[Microsoft] Rescuing email from ${senderEmail}...`);
-
-                    // Move to Inbox
-                    await axios.post(`https://graph.microsoft.com/v1.0/me/messages/${msg.id}/move`, {
-                        destinationId: 'inbox'
-                    }, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    // Mark as Read (optional, better to leave unread for reply logic? No, rescue usually implies "I saw this")
-                    // Actually, "Mark as Important" in Outlook isn't a direct flag like Gmail star, 
-                    // but we can set 'importance': 'high' via PATCH, or just rely on the move + reply.
-                    // Let's PATCH it to have importance = high
-                    await axios.patch(`https://graph.microsoft.com/v1.0/me/messages/${msg.id}`, {
-                        importance: 'high'
-                    }, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-
-                    rescuedCount++;
+                    try {
+                        await axios.post(
+                            `https://graph.microsoft.com/v1.0/me/messages/${msg.id}/move`,
+                            { destinationId: 'inbox' },
+                            cfg
+                        );
+                        rescuedCount++;
+                        console.log(`[MS-Graph] 🛟 Rescued: ${fromAddr}`);
+                    } catch (e) { }
                 }
             }
-
         } catch (error) {
-            console.error(`[Microsoft] Rescue Error (${this.account.email}):`, error.response ? error.response.data : error.message);
+            // Suppress — permissions may not allow junk access
         }
         return rescuedCount;
     }
 
-    async replyToEmail(msgId, content) {
+    async engageInbox(knownSenders) {
+        const result = { read: 0, starred: 0, replied: 0 };
+        const ContentGenerator = require('../content/generator');
+        const REPLY_CHANCE = 0.7;
+
         try {
-            const token = await this.getAccessToken();
+            await this.refreshAccessToken();
+            const cfg = this._graphConfig();
 
-            // Microsoft Graph Reply Endpoint
-            // POST /me/messages/{id}/reply
-            await axios.post(`https://graph.microsoft.com/v1.0/me/messages/${msgId}/reply`, {
-                comment: content
-            }, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            console.log(`[Microsoft] Replied to message ${msgId}`);
+            // Get recent 50 inbox messages
+            const inboxResp = await axios.get(
+                'https://graph.microsoft.com/v1.0/me/messages?$top=50&$select=id,subject,from,isRead,flag,conversationId',
+                cfg
+            );
+            const messages = inboxResp.data.value || [];
 
+            for (const msg of messages) {
+                const fromAddr = msg.from && msg.from.emailAddress ? msg.from.emailAddress.address : '';
+                const isFriend = knownSenders.some(f => fromAddr.includes(f) || (msg.subject || '').includes(f));
+                if (!isFriend) continue;
+
+                // Mark as Read
+                if (!msg.isRead) {
+                    try {
+                        await axios.patch(
+                            `https://graph.microsoft.com/v1.0/me/messages/${msg.id}`,
+                            { isRead: true },
+                            cfg
+                        );
+                        result.read++;
+                    } catch (e) { }
+                }
+
+                // Flag (Star equivalent)
+                const flagStatus = msg.flag && msg.flag.flagStatus;
+                if (flagStatus !== 'flagged') {
+                    try {
+                        await axios.patch(
+                            `https://graph.microsoft.com/v1.0/me/messages/${msg.id}`,
+                            { flag: { flagStatus: 'flagged' } },
+                            cfg
+                        );
+                        result.starred++;
+                    } catch (e) { }
+                }
+
+                // Reply (30% chance)
+                if (Math.random() < REPLY_CHANCE) {
+                    try {
+                        const replyBody = ContentGenerator.generateReply(msg.subject);
+                        await axios.post(
+                            `https://graph.microsoft.com/v1.0/me/messages/${msg.id}/reply`,
+                            { comment: replyBody },
+                            cfg
+                        );
+                        result.replied++;
+                        console.log(`[MS-Graph] 💬 Replied to ${fromAddr.substring(0, 20)}...`);
+                    } catch (e) { }
+                }
+            }
         } catch (error) {
-            console.error(`[Microsoft] Reply Error (${this.account.email}):`, error.response ? error.response.data : error.message);
+            console.error(`[MS-Graph] Engage Error (${this.email}):`, error.message);
         }
+        return result;
     }
 
     async healthCheck() {
         try {
-            await this.getAccessToken();
+            await this.refreshAccessToken();
             return { status: 'ok' };
         } catch (error) {
             return { status: 'error', error: error.message };

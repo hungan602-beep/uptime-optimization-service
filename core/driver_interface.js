@@ -19,6 +19,7 @@ class BaseDriver {
     async sendEmail(to, subject, html) { throw new Error("Method 'sendEmail' must be implemented."); }
     async rescueSpam(knownSenders) { throw new Error("Method 'rescueSpam' must be implemented."); }
     async replyToEmail(msgId, content) { throw new Error("Method 'replyToEmail' must be implemented."); }
+    async engageInbox(knownSenders) { return { read: 0, starred: 0, replied: 0 }; }
     async healthCheck() { throw new Error("Method 'healthCheck' must be implemented."); }
     async close() { }
 }
